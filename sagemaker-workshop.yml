@@ -22,7 +22,7 @@ Parameters:
     Type: String
 
   DefaultCodeRepository:
-    Default: https://github.com/awslabs/ec2-spot-labs.git
+    Default: https://github.com/aws-samples/process-optimization-workshop.git
     Type: String
 
 Resources:
