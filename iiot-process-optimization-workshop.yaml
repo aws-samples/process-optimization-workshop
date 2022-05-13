@@ -607,6 +607,15 @@ Resources:
                   - "*"
                 Resource: "arn:aws:s3:::*"
 
+  EdgeDeviceFleet:
+     Type: AWS::SageMaker::DeviceFleet
+     Properties: 
+       Description: String
+       DeviceFleetName: iiot-reactor-tank
+       OutputConfig:        
+         S3OutputLocation: !Join [ '/', [ 's3:/', !Ref 'S3Bucket', 'capture'] ]
+       RoleArn: !GetAtt ReactorSageMakerEdgeAgentDeviceFleetRole.Arn
+
 Outputs:
   NotebookInstance:
     Description: SageMaker notebook instance for the machine learning part.
@@ -614,27 +623,15 @@ Outputs:
   S3Bucket:
     Description: S3 bucket for compiled machine learning models.
     Value: !Ref S3Bucket
-  PublicSubnet:
-    Description: Public Subnet which was created by this stack.
-    Value: !Ref PublicSubnet
-  PublicSubnetAZ:
-    Description: Availability zone in which the public subnet was created.
-    Value: !GetAtt PublicSubnet.AvailabilityZone
-  PublicRouteTable:
-    Description: Route table of the public subnet
-    Value: !Ref PublicRouteTable
   ReactorEC2Instance:
     Description: EC2 instance that runs Greengrass.
     Value: !Ref ReactorEC2Instance
   ReactorAvailabilityZone:
     Description: Availability zone where GG runs
     Value: !GetAtt ReactorEC2Instance.AvailabilityZone
-  ReactorPrivateDnsName:
-    Description: Private DNS name of the EC2 instance that runs GG.
-    Value: !GetAtt ReactorEC2Instance.PrivateDnsName
   ReactorPrivateIp:
     Description: Private IP of the EC2 instance that runs the reactor.
     Value: !GetAtt ReactorEC2Instance.PrivateIp
-  ReactorSageMakerEdgeAgentDeviceFleetRole:
-    Description: ARN of SageMaker Edge Agent Device Fleet role
-    Value: !GetAtt ReactorSageMakerEdgeAgentDeviceFleetRole.Arn
+  ReactorSageMakerDeviceFleet:
+    Description: SageMaker device fleet
+    Value: !Ref EdgeDeviceFleet
