@@ -635,3 +635,6 @@ Outputs:
   ReactorPrivateIp:
     Description: Private IP of the EC2 instance that runs the reactor.
     Value: !GetAtt ReactorEC2Instance.PrivateIp
+  ReactorSageMakerEdgeAgentDeviceFleetRole:
+    Description: ARN of SageMaker Edge Agent Device Fleet role
+    Value: !GetAtt ReactorSageMakerEdgeAgentDeviceFleetRole.Arn
