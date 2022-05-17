@@ -39,6 +39,33 @@ Resources:
   #################################
   #  IAM resources
   #################################
+  # Only needed for EventEngine accounts and new accounts
+  GreengrassV2TokenExchangeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: credentials.iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: GreengrassV2TokenExchangeRoleAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                  - s3:GetBucketLocation
+                Resource: "*"
+      RoleName: GreengrassV2TokenExchangeRole
+      Description: GG role
+  # Until here
 
   ReactorSageMakerEdgeAgentDeviceFleetRole:
     Type: AWS::IAM::Role
