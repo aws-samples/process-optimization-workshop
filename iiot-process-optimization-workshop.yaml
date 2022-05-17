@@ -3,7 +3,7 @@ Description: Template to create environment for the AWS Process Optimization wor
 
 Parameters:
   CreateGreengrassTokenExchangeRole:
-    Default: false
+    Default: true
     Type: String
     AllowedValues: [true, false]
   GitHubCodeRepository:
@@ -73,7 +73,7 @@ Resources:
                 Resource: "*"
       RoleName: GreengrassV2TokenExchangeRole
       Description: GG role
-      Condition: Conditions
+      Condition: CreateTokenExchangeRole
   # Until here
 
   ReactorSageMakerEdgeAgentDeviceFleetRole:
