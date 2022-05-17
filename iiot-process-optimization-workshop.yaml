@@ -73,7 +73,7 @@ Resources:
                 Resource: "*"
       RoleName: GreengrassV2TokenExchangeRole
       Description: GG role
-      Condition: CreateTokenExchangeRole
+    Condition: CreateTokenExchangeRole
   # Until here
 
   ReactorSageMakerEdgeAgentDeviceFleetRole:
