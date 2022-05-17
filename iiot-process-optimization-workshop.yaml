@@ -2,6 +2,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Template to create environment for the AWS Process Optimization workshop
 
 Parameters:
+  CreateGreengrassTokenExchangeRole:
+    Default: false
+    Type: String
+    AllowedValues: [true, false]
   GitHubCodeRepository:
     Default: https://github.com/aws-samples/process-optimization-workshop.git
     Type: String
@@ -16,6 +20,10 @@ Parameters:
   GroupName:
     Type: String
     Default: "iiot-reactor-group"
+
+Conditions:
+  CreateTokenExchangeRole:
+    !Equals [true, !Ref CreateGreengrassTokenExchangeRole]
 
 Mappings:
   Region2LinuxAMI:
@@ -65,6 +73,7 @@ Resources:
                 Resource: "*"
       RoleName: GreengrassV2TokenExchangeRole
       Description: GG role
+      Condition: Conditions
   # Until here
 
   ReactorSageMakerEdgeAgentDeviceFleetRole:
