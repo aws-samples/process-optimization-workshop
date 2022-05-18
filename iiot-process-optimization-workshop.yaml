@@ -47,7 +47,16 @@ Resources:
   #################################
   #  IAM resources
   #################################
-  # Only needed for EventEngine accounts and new accounts
+
+  SWMAdminUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: SWMAdmin
+      LoginProfile:
+        Password: Password01
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSIoTSiteWiseMonitorPortalAccess
+
   GreengrassV2TokenExchangeRole:
     Type: AWS::IAM::Role
     Properties:
@@ -131,21 +140,21 @@ Resources:
                   - iot:TagResource
                   - iot:ListTagsForResource
                 Resource: !Join
-                            - ''
-                            - - 'arn:aws:iot:'
-                              - !Ref 'AWS::Region'
-                              - ":"
-                              - !Ref 'AWS::AccountId'
-                              - ':rolealias/SageMaker*'
+                  - ''
+                  - - 'arn:aws:iot:'
+                    - !Ref 'AWS::Region'
+                    - ":"
+                    - !Ref 'AWS::AccountId'
+                    - ':rolealias/SageMaker*'
               - Effect: Allow
                 Action:
                   - iam:GetRole
                   - iam:PassRole
                 Resource: !Join
-                            - ''
-                            - - 'arn:aws:iam::'
-                              - !Ref 'AWS::Region'
-                              - ':role/*SageMaker*'
+                  - ''
+                  - - 'arn:aws:iam::'
+                    - !Ref 'AWS::Region'
+                    - ':role/*SageMaker*'
       RoleName: ReactorSageMakerEdgeAgentDeviceFleetRole
       Description: Give Sagemaker access to required entities
 
@@ -482,7 +491,7 @@ Resources:
                                   }
                               ]
                           },
-                          "measurementDataStreamPrefix": "OPCUAServer"
+                          "measurementDataStreamPrefix": ""
                       }
                   ]
               }
@@ -627,18 +636,18 @@ Resources:
           ToPort: '443'
           CidrIp: 0.0.0.0/0
 
-  SageMakerExecutionRole: 
+  SageMakerExecutionRole:
     Type: AWS::IAM::Role
-    Properties: 
-      AssumeRolePolicyDocument: 
+    Properties:
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
-        Statement: 
-          - 
+        Statement:
+          -
             Effect: "Allow"
-            Principal: 
-              Service: 
+            Principal:
+              Service:
                 - "sagemaker.amazonaws.com"
-            Action: 
+            Action:
               - "sts:AssumeRole"
       Path: "/"
       ManagedPolicyArns:
@@ -646,25 +655,25 @@ Resources:
         - arn:aws:iam::aws:policy/AWSIoTFullAccess
         - arn:aws:iam::aws:policy/AWSGreengrassFullAccess
       Policies:
-        - 
+        -
           PolicyName: "s3_access"
-          PolicyDocument: 
+          PolicyDocument:
             Version: "2012-10-17"
-            Statement: 
-              - 
+            Statement:
+              -
                 Effect: "Allow"
-                Action: 
+                Action:
                   - "*"
                 Resource: "arn:aws:s3:::*"
 
   EdgeDeviceFleet:
-     Type: AWS::SageMaker::DeviceFleet
-     Properties: 
-       Description: String
-       DeviceFleetName: iiot-reactor-tank
-       OutputConfig:        
-         S3OutputLocation: !Join [ '/', [ 's3:/', !Ref 'S3Bucket', 'capture'] ]
-       RoleArn: !GetAtt ReactorSageMakerEdgeAgentDeviceFleetRole.Arn
+    Type: AWS::SageMaker::DeviceFleet
+    Properties:
+      Description: String
+      DeviceFleetName: iiot-reactor-tank
+      OutputConfig:
+        S3OutputLocation: !Join [ '/', [ 's3:/', !Ref 'S3Bucket', 'capture'] ]
+      RoleArn: !GetAtt ReactorSageMakerEdgeAgentDeviceFleetRole.Arn
 
 Outputs:
   NotebookInstance:
