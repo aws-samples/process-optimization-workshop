@@ -65,12 +65,26 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  - iot:Connect
+                  - iot:DescribeCertificate
+                  - iot:Publish
+                  - iot:Receive
+                  - iot:Subscribe
+                  - s3:CreateBucket
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListAllMyBuckets
+                  - s3:ListBucket
+                  - s3:PutObject
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
-                  - logs:PutLogEvents
                   - logs:DescribeLogStreams
-                  - s3:GetBucketLocation
+                  - logs:PutLogEvents
                 Resource: "*"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSIoTThingsRegistration'
+        - 'arn:aws:iam::aws:policy/service-role/AWSIoTLogging'
+        - 'arn:aws:iam::aws:policy/service-role/AWSIoTRuleActions'
       RoleName: GreengrassV2TokenExchangeRole
       Description: GG role
     Condition: CreateTokenExchangeRole
