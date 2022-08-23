@@ -184,35 +184,55 @@ def process_input(client, userdata, message):
     global model_name
     global model_unload
     global model_url
+    json_input = {"status":"not started"}
+    try:
+        # make sure our model is loaded
+        if model_unload == False:
+            print("CSTR_Predictor: process_input(): Loading model: " + model_url)
+            bind_to_seam(model_url)
 
-    # make sure our model is loaded
-    if model_unload == False:
-        print("CSTR_Predictor: process_input(): Loading model: " + model_url)
-        bind_to_seam(model_url)
-
-    # Make sure we have valid params
-    json_input = json.loads(message.payload.decode())
-    if stop_received(json_input):
-        main_loop_on = False
-    else:
-        if model_unload == True:
-            if "F" in json_input and "Q_dot" in json_input:
-                # Invoke the prediction function
-                print("CSTR_Predictor: Calling predict() with Input: " + str(json_input))
-                result = predict(model_name, json_input)
-
-                # post the results to IoTCore MQTT topic
-                print("CSTR_Predictor: Publishing results: " + str(result) + " to topic: " + result_topic + "...")
-                publish_results_to_iotcore(handle,json_input,result,result_topic)
-            else:
-                # invalid params... ignore
-                print("CSTR_Predictor: Invalid parameters supplied. Please check input JSON...must contain F and Q_dot keys.")
-                fmt_predict_response = {"status":"error","info":"missing F and/or Q_dot keys in input"}
-                publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
+        # Make sure we have valid params
+        json_input = json.loads(message.payload.decode())
+        if stop_received(json_input):
+            main_loop_on = False
         else:
-            # invalid params... ignore
-            print("CSTR_Predictor: No models appear loaded.")
-            fmt_predict_response = {"status":"error","info":"no models appear loaded"}
+            if model_unload == True:
+                if "F" in json_input and "Q_dot" in json_input:
+                    if isinstance(json_input['F'], float) or isinstance(json_input['F'], int):
+                        if isinstance(json_input['Q_dot'], float) or isinstance(json_input['Q_dot'], int):
+                            # Invoke the prediction function
+                            print("CSTR_Predictor: Calling predict() with Input: " + str(json_input))
+                            result = predict(model_name, json_input)
+
+                            # post the results to IoTCore MQTT topic
+                            print("CSTR_Predictor: Publishing results: " + str(result) + " to topic: " + result_topic + "...")
+                            publish_results_to_iotcore(handle,json_input,result,result_topic)
+                        else:
+                            # incorrect input format - Q_dot
+                            print("CSTR_Predictor: Incorrect input format - Q_dot. Must be float or integer")
+                            fmt_predict_response = {"status":"error","info":"Incorrect input format - Q_dot. Must be float or integer"}
+                            publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
+                    else:
+                        # incorrect input format - F
+                        print("CSTR_Predictor: Incorrect input format - F. Must be float or integer")
+                        fmt_predict_response = {"status":"error","info":"Incorrect input format - F. Must be float or integer"}
+                        publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
+                else:
+                    # invalid params... ignore
+                    print("CSTR_Predictor: Invalid parameters supplied. Please check input JSON...must contain F and Q_dot keys.")
+                    fmt_predict_response = {"status":"error","info":"missing F and/or Q_dot keys in input"}
+                    publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
+            else:
+                # no models were loaded... ignore
+                print("CSTR_Predictor: No models appear loaded.")
+                fmt_predict_response = {"status":"error","info":"no models appear loaded"}
+                publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
+    except:
+            e = sys.exc_info()[0]
+            print("CSTR_Predictor: Exception in process_input(): " + str(e))
+            print(traceback.format_exc())
+            json_input = {"status":"in exception"}
+            fmt_predict_response = {"status":"exception","info":str(e)}
             publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
 
 def main_loop(model_name):

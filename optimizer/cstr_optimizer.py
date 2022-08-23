@@ -41,6 +41,7 @@ COMPONENT_CLIENTID = "CSTROptimizer"
 model_loaded = True
 model_unload = False
 model_url = ""
+g_max_iterations = 2000     # Maximum iterations defaulted
 
 def list_models():
     try:
@@ -195,25 +196,33 @@ def optimal_manipulated_vars(model_name, C_b_ref, max_iterations):
     bounds = ((5.0, 100.0), (-5000.0, 0.0))
     
     def objective(x):
-        '''
-        Objective function to minimize: Penalizes deviations from
-        C_b_ref and T_K leaving the desired range
-        '''
-        # DA: COMMENT OUT: manipulated_vars = pd.DataFrame({"F": [x[0]], "Q_dot" : [x[1]]})
-        # DA: Create compatiable {F, Q_dot} input for the predict() function...
-        predict_input = {"F":x[0], "Q_dot":x[1]}
-
-        # DA: call predict()...
-        prediction = predict(model_name, predict_input)
-
         cost = 0.0
-        # Deviation from reference C_b_ref
-        cost += (prediction["C_b"]-C_b_ref)**2
-        # Cooling jacket temperature
-        if (prediction["T_K"] < 5.0):
-            cost += 0.01*(prediction["T_K"]-5.0)**2
-        elif (prediction["T_K"] > 140.0):
-            cost += 0.01*(prediction["T_K"]-140.0)**2
+        try:
+            '''
+            Objective function to minimize: Penalizes deviations from
+            C_b_ref and T_K leaving the desired range
+            '''
+            # DA: COMMENT OUT: manipulated_vars = pd.DataFrame({"F": [x[0]], "Q_dot" : [x[1]]})
+            # DA: Create compatiable {F, Q_dot} input for the predict() function...
+            predict_input = {"F":x[0], "Q_dot":x[1]}
+
+            # DA: call predict()...
+            prediction = predict(model_name, predict_input)
+
+            # Deviation from reference C_b_ref
+            if "C_b" in prediction:
+                cost += (prediction["C_b"]-C_b_ref)**2
+                # Cooling jacket temperature
+                if (prediction["T_K"] < 5.0):
+                    cost += 0.01*(prediction["T_K"]-5.0)**2
+                elif (prediction["T_K"] > 140.0):
+                    cost += 0.01*(prediction["T_K"]-140.0)**2
+            else:
+                print("CSTR_Optimizer(objective): Model was not loaded: " + model_name + ". Unable to optimize")
+        except:
+            e = sys.exc_info()[0]
+            print("CSTR_Optimizer: Exception in CSTR_Optimizer(objective): " + str(e))
+            print(traceback.format_exc())
 
         return cost
 
@@ -233,61 +242,83 @@ def process_input(client, userdata, message):
     global model_name
     global model_unload
     global model_url
+    global g_max_iterations
+    json_input = {"status":"not started"}
 
-    # make sure our model is loaded
-    if model_unload == False:
-        print("CSTR_Optimizer: process_input(): Loading model: " + model_url)
-        bind_to_seam(model_url)
+    try:
+        # make sure our model is loaded
+        if model_unload == False:
+            print("CSTR_Optimizer: process_input(): Loading model: " + model_url)
+            bind_to_seam(model_url)
 
-    json_input = json.loads(message.payload.decode())
-    if stop_received(json_input):
-        main_loop_on = False
-    else:
-        if model_unload == True:
-            # Make sure we have valid params
-            if "C_b_ref" in json_input:
-                # Assign a UUID if one was not provided
-                my_uuid = str(uuid.uuid4())
-                if "uuid" in json_input:
-                    my_uuid = json_input['uuid']
+        json_input = json.loads(message.payload.decode())
+        if stop_received(json_input):
+            main_loop_on = False
+        else:
+            if model_unload == False:
+                print("CSTR_Optimizer: process_input(): Loading model: " + model_url)
+                bind_to_seam(model_url)
+            if model_unload == True:
+                # Make sure we have valid params
+                if "C_b_ref" in json_input:
+                    if isinstance(json_input['C_b_ref'], float) or isinstance(json_input['C_b_ref'], int):
+                        # Assign a UUID if one was not provided
+                        my_uuid = str(uuid.uuid4())
+                        if "uuid" in json_input:
+                            my_uuid = json_input['uuid']
 
-                # Immediately send dispatch that optimizer invoked
-                in_progress = {"status": "running", "uuid": my_uuid}
-                print("CSTR_Optimizer: STARTING: Optimization started: " + str(in_progress) + " to topic: " + result_topic + "...")
-                publish_results_to_iotcore(handle,json_input,in_progress,result_topic)
+                        # If max_iterations provided, use it...
+                        if "max_iterations" in json_input and isinstance(json_input['max_iterations'], int):
+                            g_max_iterations = json_input['max_iterations']
 
-                # Invoke the optimizer... LONG WINDED...
-                print("CSTR_Optimizer: Calling optimal_manipulated_vars() with C_b_ref: " + str(json_input['C_b_ref']) + " Max Iterations: " + str(json_input['max_iterations']))
-                x, nfev, elapsed_secs = optimal_manipulated_vars(model_name, json_input['C_b_ref'], json_input['max_iterations'])
+                        # Immediately send dispatch that optimizer invoked
+                        in_progress = {"status": "running", "uuid": my_uuid}
+                        print("CSTR_Optimizer: STARTING: Optimization started: " + str(in_progress) + " to topic: " + result_topic + "...")
+                        publish_results_to_iotcore(handle,json_input,in_progress,result_topic)
 
-                # Call predict once more on the final optimization values
-                predict_input = {"F":x[0], "Q_dot":x[1]}
+                        # Invoke the optimizer... LONG WINDED...
+                        print("CSTR_Optimizer: Calling optimal_manipulated_vars() with C_b_ref: " + str(json_input['C_b_ref']) + " Max Iterations: " + str(g_max_iterations))
+                        x, nfev, elapsed_secs = optimal_manipulated_vars(model_name, json_input['C_b_ref'], g_max_iterations)
 
-                # DA: call a final predict() per the notebook...
-                print("predict(): Input Args: " + str(predict_input) + " Model Name: " + model_name)
-                prediction = predict(model_name, predict_input)
+                        # Call predict once more on the final optimization values
+                        predict_input = {"F":x[0], "Q_dot":x[1]}
 
-                # DA: Format the result to match evaluate_pytorch_model()
-                prediction['C_b_ref'] = json_input['C_b_ref']
-                prediction['iterations'] = nfev
-                prediction['status'] = "finished"
-                prediction['uuid'] = my_uuid
-                prediction['execute_time_secs'] = round(elapsed_secs,1)
+                        # DA: call a final predict() per the notebook...
+                        print("predict(): Input Args: " + str(predict_input) + " Model Name: " + model_name)
+                        prediction = predict(model_name, predict_input)
 
-                # post the results to IoTCore MQTT topic
-                print("CSTR_Optimizer: FINISHED: Optimizing results: " + str(prediction) + " to topic: " + result_topic + "...")
-                publish_results_to_iotcore(handle,json_input,prediction,result_topic)
+                        # DA: Format the result to match evaluate_pytorch_model()
+                        prediction['C_b_ref'] = json_input['C_b_ref']
+                        prediction['iterations'] = nfev
+                        prediction['status'] = "finished"
+                        prediction['uuid'] = my_uuid
+                        prediction['execute_time_secs'] = round(elapsed_secs,1)
+
+                        # post the results to IoTCore MQTT topic
+                        print("CSTR_Optimizer: FINISHED: Optimizing results: " + str(prediction) + " to topic: " + result_topic + "...")
+                        publish_results_to_iotcore(handle,json_input,prediction,result_topic)
+                    else:
+                        # Incorrect format 
+                        print("CSTR_Optimizer: C_b_ref supplied in incorrect format. Must be float or integer.")
+                        fmt_predict_response = {"status":"error","info":"C_b_ref supplied in incorrect format. Must be float or integer"}
+                        publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
+                else:
+                    # invalid params... ignore
+                    print("CSTR_Optimizer: Invalid parameters supplied. Please check input JSON...must contain C_b_ref key.")
+                    fmt_predict_response = {"status":"error","info":"missing C_b_ref key in input"}
+                    publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
             else:
                 # invalid params... ignore
-                print("CSTR_Optimizer: Invalid parameters supplied. Please check input JSON...must contain C_b_ref key.")
-                fmt_predict_response = {"status":"error","info":"missing C_b_ref key in input"}
+                print("CSTR_Optimizer: No models appear loaded.")
+                fmt_predict_response = {"status":"error","info":"no models appear loaded"}
                 publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
-        else:
-            # invalid params... ignore
-            print("CSTR_Optimizer: No models appear loaded.")
-            fmt_predict_response = {"status":"error","info":"no models appear loaded"}
+    except:
+            e = sys.exc_info()[0]
+            print("CSTR_Optimizer: Exception in process_input(): " + str(e))
+            print(traceback.format_exc())
+            json_input = {"status":"in exception"}
+            fmt_predict_response = {"status":"exception","info":str(e)}
             publish_results_to_iotcore(handle,json_input,fmt_predict_response,result_topic)
-
 
 def main_loop(model_name):
     print("CSTR_Optimizer: Entering main loop()...")
